@@ -41,7 +41,9 @@ def _i3_socket_path() -> str | None:
         pass
     # DISPLAY-respecting fallback (reads the same atom, minus $I3SOCK).
     try:
-        out = subprocess.run(["i3", "--get-socketpath"], capture_output=True, text=True)
+        out = subprocess.run(
+            ["i3", "--get-socketpath"], capture_output=True, text=True, timeout=5
+        )
         if out.stdout.strip():
             return out.stdout.strip()
     except Exception:
@@ -137,4 +139,11 @@ def find_window(con_id: int) -> dict | None:
 def focus_window(con_id: int) -> bool:
     conn = _conn()
     replies = conn.command(f"[con_id={int(con_id)}] focus")
-    return all(r.success for r in replies)
+    if not (replies and all(r.success for r in replies)):
+        return False
+    # i3 reports success even when the criteria matched NO container, so the
+    # command "succeeding" is not proof. Confirm focus actually landed on the
+    # requested window — this is the only reliable signal, and the guard that
+    # keeps keystrokes from going to the wrong window.
+    focused = conn.get_tree().find_focused()
+    return focused is not None and focused.id == con_id

@@ -39,12 +39,13 @@ frame (region origin + scale), and the pointer tools accept coordinates *in the
 screenshot's pixel space* and translate them:
 
 ```
-global_x = region.x + screenshot_x / scale
-global_y = region.y + screenshot_y / scale
+global_x = region.x + screenshot_x / scale_x
+global_y = region.y + screenshot_y / scale_y
 ```
 
-Practically: take a screenshot, then give `click(x, y)` the pixel you see in
-*that* image. Each screenshot resets the reference frame.
+Practically: take a screenshot (it returns a `frame_id`), then call
+`click(x, y, frame_id=…)` with the pixel you see in *that* image. Pointer tools
+reject a missing or stale `frame_id` rather than guessing against the wrong one.
 
 ## Run it safely first (Xephyr sandbox)
 
@@ -88,8 +89,8 @@ managed by `uv`.
 - On `:0` it can click anything you can: terminals with sudo, your password
   manager, Slack, email. Prefer the sandbox; supervise live runs.
 - Emergency stop for a live run: kill the MCP server, or `pkill xdotool`.
-- Long automated runs can idle-lock the screen (synthetic input doesn't reset the
-  DPMS/screensaver timer) — see [`docs/gotchas.md`](./docs/gotchas.md).
+- Every tool call resets the idle timer (`xset s reset`), so active runs don't
+  self-lock; the screen still locks normally when idle. See [`docs/gotchas.md`](./docs/gotchas.md).
 
 ## License
 

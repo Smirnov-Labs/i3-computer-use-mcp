@@ -2,35 +2,56 @@
 
 xdotool and the i3 tree both speak *global* X coordinates — one plane spanning
 every output. Screenshots we hand the model are cropped to a single output (or
-window) and downscaled to fit the vision API's image budget. This module records
-the last capture's frame so the click/move/scroll tools can accept coordinates
-*as measured in the screenshot the model was just shown* and translate them back
-to the real screen. That indirection is the whole reason a model can reliably
-click on a multi-output desktop without doing arithmetic itself.
+window) and downscaled to fit the vision API's image budget. A ``CaptureFrame``
+records the mapping from one screenshot's pixel space back to global X pixels.
+
+The ``FrameStore`` binds a screenshot to an opaque id so that a later click can
+name *the exact screenshot it reasoned about* — the pointer tools take that id
+and the store rejects a stale one instead of silently resolving against
+"whatever screenshot happened last" (which races under concurrent tool calls).
 """
 from __future__ import annotations
 
+import itertools
 from dataclasses import dataclass
 from threading import Lock
 
 
+class CaptureFrameError(RuntimeError):
+    """Base class for capture-frame resolution errors."""
+
+
+class NoActiveCapture(CaptureFrameError):
+    """A pointer tool was called before any screenshot was taken."""
+
+
+class StaleFrame(CaptureFrameError):
+    """A pointer tool named a frame id that is no longer the current one."""
+
+
 @dataclass(frozen=True)
 class CaptureFrame:
-    """The mapping from one screenshot's pixel space back to global X pixels."""
+    """The mapping from one screenshot's pixel space back to global X pixels.
+
+    Scale is stored per-axis: Pillow rounds width and height independently, so
+    the achieved horizontal and vertical scale can differ slightly, and a single
+    isotropic factor would drift by up to ~1px on extreme aspect ratios.
+    """
 
     region_x: int  # global-X origin of the captured region
     region_y: int
     region_w: int  # size of the captured region in global px (pre-scale)
     region_h: int
-    scale: float  # screenshot_px = global_px * scale  (<= 1.0)
+    scale_x: float  # screenshot_px = global_px * scale   (per axis, <= 1.0)
+    scale_y: float
     shot_w: int  # resulting screenshot size in px
     shot_h: int
     label: str  # human label, e.g. "output DP-0" or "window 94 (Slack)"
 
     def to_global(self, sx: float, sy: float) -> tuple[int, int]:
         """Map a screenshot-pixel coordinate to a global X coord, clamped to region."""
-        gx = self.region_x + sx / self.scale
-        gy = self.region_y + sy / self.scale
+        gx = self.region_x + sx / self.scale_x
+        gy = self.region_y + sy / self.scale_y
         gx = min(max(gx, self.region_x), self.region_x + self.region_w - 1)
         gy = min(max(gy, self.region_y), self.region_y + self.region_h - 1)
         return int(round(gx)), int(round(gy))
@@ -43,22 +64,52 @@ class CaptureFrame:
                 "w": self.region_w,
                 "h": self.region_h,
             },
-            "scale": round(self.scale, 5),
+            "scale_x": round(self.scale_x, 5),
+            "scale_y": round(self.scale_y, 5),
             "screenshot_size": {"w": self.shot_w, "h": self.shot_h},
             "captured": self.label,
         }
 
 
-_lock = Lock()
-_last: CaptureFrame | None = None
+class FrameStore:
+    """Holds the most recent capture and hands out/validates opaque frame ids."""
+
+    def __init__(self) -> None:
+        self._lock = Lock()
+        self._counter = itertools.count(1)
+        self._last_id: str | None = None
+        self._last_frame: CaptureFrame | None = None
+
+    def set_last(self, frame: CaptureFrame) -> str:
+        """Store ``frame`` as the current capture and return its new opaque id."""
+        with self._lock:
+            self._last_id = f"cap-{next(self._counter)}"
+            self._last_frame = frame
+            return self._last_id
+
+    def get_last(self) -> tuple[str | None, CaptureFrame | None]:
+        with self._lock:
+            return self._last_id, self._last_frame
+
+    def resolve(self, frame_id: str | None = None) -> CaptureFrame:
+        """Return the frame for ``frame_id``.
+
+        ``frame_id=None`` means "use the last capture". Raises ``NoActiveCapture``
+        if nothing has been captured yet, or ``StaleFrame`` if a specific id was
+        given that is no longer current.
+        """
+        with self._lock:
+            if self._last_frame is None:
+                raise NoActiveCapture(
+                    "no screenshot has been taken yet — call screenshot first"
+                )
+            if frame_id is not None and frame_id != self._last_id:
+                raise StaleFrame(
+                    f"frame {frame_id!r} is stale (current is {self._last_id!r}); "
+                    "take a fresh screenshot before acting on it"
+                )
+            return self._last_frame
 
 
-def set_last(frame: CaptureFrame) -> None:
-    global _last
-    with _lock:
-        _last = frame
-
-
-def get_last() -> CaptureFrame | None:
-    with _lock:
-        return _last
+# Process-wide default store used by the MCP server.
+frames = FrameStore()

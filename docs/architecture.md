@@ -39,18 +39,21 @@ spanning every monitor. Screenshots are **cropped to one output** (or window) an
 **downscaled**. So each screenshot records a `CaptureFrame`:
 
 - `region_{x,y,w,h}` — the global-X rectangle it covers
-- `scale` — `screenshot_px = global_px * scale` (≤ 1.0)
+- `scale_x` / `scale_y` — `screenshot_px = global_px * scale` per axis (≤ 1.0;
+  Pillow rounds width/height independently, so the axes can differ slightly)
 
 and pointer tools accept coordinates *in the screenshot's pixels* and map back:
 
 ```
-global_x = region_x + screenshot_x / scale
-global_y = region_y + screenshot_y / scale   (clamped to the region)
+global_x = region_x + screenshot_x / scale_x
+global_y = region_y + screenshot_y / scale_y   (clamped to the region)
 ```
 
-The server keeps the **last** capture as the reference frame, so the natural
-loop — `screenshot` then `click(x, y)` on what you see — just works. Each new
-screenshot resets the frame.
+A `FrameStore` binds each capture to an opaque `frame_id`; `screenshot` returns
+it and the pointer tools take it back, so a click resolves against *the exact
+screenshot it was reasoned against*. A missing id (no screenshot yet) or a stale
+one (a newer screenshot replaced it — possible under concurrent tool calls) is
+rejected with a clear error, not silently mapped against the wrong frame.
 
 ## Display & socket resolution (why the sandbox is real)
 

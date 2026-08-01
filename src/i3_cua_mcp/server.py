@@ -1,13 +1,17 @@
 """i3-aware computer-use MCP server (X11).
 
 Tools let a model SEE the desktop (per-output / per-window screenshots),
-UNDERSTAND it (i3 tree: windows, geometry, focus), and DRIVE it
-(click / type / key / scroll) — with pointer coordinates measured in the
-*screenshot the model was just handed*, which the server maps back to the real
-multi-output screen.
+UNDERSTAND it (i3 tree), and DRIVE it (click / type / key / scroll).
 
-Scope: read + focus + input. Layout mutation (move/resize/relayout/workspaces)
-is intentionally out of scope — see DESIGN-i3-control-extension.md.
+Two safety contracts enforced here:
+- Pointer tools take the `frame_id` of the screenshot they were reasoned against,
+  and the server rejects a stale/absent one instead of silently mapping against
+  "whatever screenshot happened last" (races) or raw global pixels (no screenshot).
+- Keyboard tools with a `con_id` VERIFY focus actually landed before sending any
+  keystroke — a stale con_id fails loudly rather than typing into the wrong window.
+
+Scope: read + focus + input. Layout mutation is out of scope
+(see DESIGN-i3-control-extension.md).
 """
 from __future__ import annotations
 
@@ -17,22 +21,22 @@ import sys
 
 from mcp.server.mcpserver import MCPServer, Image
 
-from . import capture, i3tree, inputs
-from .coords import get_last, set_last
+from . import capture, coords, i3tree, inputs
 
 mcp = MCPServer("i3-cua", version="0.1.0")
 
 
 def _shot_response(shot: capture.Shot):
-    """Store the mapping and return [image, caption] for the model."""
-    set_last(shot.frame)
+    """Store the mapping under a fresh id and return [image, caption]."""
+    frame_id = coords.frames.set_last(shot.frame)
     meta = shot.frame.as_dict()
+    meta["frame_id"] = frame_id
     caption = (
         f"Screenshot of {meta['captured']} — "
-        f"{meta['screenshot_size']['w']}x{meta['screenshot_size']['h']}px "
-        f"(scale {meta['scale']}). Give click/move/scroll/drag coordinates in "
-        "THIS image's pixel space (top-left = 0,0); the server maps them to the "
-        "real screen.\n" + json.dumps(meta)
+        f"{meta['screenshot_size']['w']}x{meta['screenshot_size']['h']}px. "
+        f"frame_id={frame_id!r}. Give click/move/scroll/drag coordinates in THIS "
+        "image's pixel space (top-left = 0,0) and pass this frame_id so the server "
+        "maps against the screenshot you actually saw.\n" + json.dumps(meta)
     )
     return [Image(data=shot.png, format="png"), caption]
 
@@ -57,18 +61,19 @@ def screenshot(output: str | None = None):
     """Screenshot one output (monitor); defaults to the primary output.
 
     Pass an output name from get_outputs (e.g. "DP-0") to target another monitor.
-    A full-desktop grab would span every monitor and downscale badly, so this is
-    per-output by design.
+    Returns the image plus a frame_id — pass that frame_id to click/move/etc.
     """
     outs = i3tree.get_outputs()
     if output:
         target = next((o for o in outs if o["name"] == output), None)
         if target is None:
-            return f"No such output {output!r}. Available: {[o['name'] for o in outs]}"
+            raise ValueError(
+                f"no such output {output!r}; available: {[o['name'] for o in outs]}"
+            )
     else:
         target = i3tree.primary_output(outs)
     if target is None:
-        return "No active outputs found."
+        raise RuntimeError("no active outputs found")
     r = target["rect"]
     shot = capture.capture_region(r["x"], r["y"], r["w"], r["h"], f"output {target['name']}")
     return _shot_response(shot)
@@ -78,103 +83,126 @@ def screenshot(output: str | None = None):
 def screenshot_window(con_id: int):
     """Full-resolution screenshot cropped to a single window (by i3 con id).
 
-    Great for reading small text: a window crop is usually under the scale budget
-    so you see it 1:1.
+    NOTE: this crops the root grab by the window's *geometry*; it does not verify
+    the window is the topmost content there. For a window in a tabbed/stacking
+    container that isn't the active child, the pixels shown may be a sibling. A
+    warning is added to the caption when the window isn't focused.
     """
     w = i3tree.find_window(con_id)
     if w is None:
-        return f"No window with con id {con_id}. Call list_windows first."
+        raise ValueError(f"no window with con id {con_id}; call list_windows first")
     if not w["visible"]:
-        return (
-            f"Window {con_id} ({w['wm_class']}) is on non-visible workspace "
-            f"{w['workspace']!r}. focus_window it first, or screenshot its output."
+        raise ValueError(
+            f"window {con_id} ({w['wm_class']}) is on non-visible workspace "
+            f"{w['workspace']!r}; focus_window it first, or screenshot its output"
         )
     r = w["rect"]
     label = f"window {con_id} ({w['wm_class'] or '?'}: {w['title'] or ''})".strip()
+    if not w["focused"]:
+        label += " [not focused — if it's in a tabbed/stacked container these pixels may be a sibling window]"
     shot = capture.capture_region(r["x"], r["y"], r["w"], r["h"], label)
     return _shot_response(shot)
 
 
-# --- pointer (coordinates are in the last screenshot's pixel space) ----------
+# --- pointer (coordinates are in the named screenshot's pixel space) ---------
 
-def _map(x: float, y: float):
-    frame = get_last()
-    if frame is None:
-        return int(round(x)), int(round(y)), "global (no prior screenshot)"
+@mcp.tool()
+def click(x: float, y: float, button: str = "left", frame_id: str | None = None) -> str:
+    """Click at (x,y) in the pixels of screenshot `frame_id` (default: the last
+    screenshot). button: left|middle|right. Errors if no screenshot exists yet or
+    the frame_id is stale."""
+    frame = coords.frames.resolve(frame_id)
     gx, gy = frame.to_global(x, y)
-    return gx, gy, frame.label
-
-
-@mcp.tool()
-def click(x: float, y: float, button: str = "left") -> str:
-    """Click at (x,y) measured in the last screenshot's pixels. button: left|middle|right."""
-    gx, gy, ref = _map(x, y)
+    inputs.reset_idle()
     inputs.click(gx, gy, button)
-    return f"{button} click at screenshot({x},{y}) -> screen({gx},{gy}) [ref: {ref}]"
+    return f"{button} click at shot({x},{y}) -> screen({gx},{gy}) [frame {frame_id or 'last'}: {frame.label}]"
 
 
 @mcp.tool()
-def double_click(x: float, y: float, button: str = "left") -> str:
-    """Double-click at (x,y) in the last screenshot's pixel space."""
-    gx, gy, ref = _map(x, y)
+def double_click(x: float, y: float, button: str = "left", frame_id: str | None = None) -> str:
+    """Double-click at (x,y) in screenshot `frame_id`'s pixel space."""
+    frame = coords.frames.resolve(frame_id)
+    gx, gy = frame.to_global(x, y)
+    inputs.reset_idle()
     inputs.click(gx, gy, button, count=2)
-    return f"double {button} click at screen({gx},{gy}) [ref: {ref}]"
+    return f"double {button} click at screen({gx},{gy})"
 
 
 @mcp.tool()
-def move_mouse(x: float, y: float) -> str:
-    """Move the pointer to (x,y) in the last screenshot's pixel space."""
-    gx, gy, ref = _map(x, y)
+def move_mouse(x: float, y: float, frame_id: str | None = None) -> str:
+    """Move the pointer to (x,y) in screenshot `frame_id`'s pixel space."""
+    frame = coords.frames.resolve(frame_id)
+    gx, gy = frame.to_global(x, y)
+    inputs.reset_idle()
     inputs.move(gx, gy)
-    return f"moved to screen({gx},{gy}) [ref: {ref}]"
+    return f"moved to screen({gx},{gy})"
 
 
 @mcp.tool()
-def drag(x1: float, y1: float, x2: float, y2: float, button: str = "left") -> str:
-    """Drag from (x1,y1) to (x2,y2); coords in the last screenshot's pixel space."""
-    gx1, gy1, ref = _map(x1, y1)
-    gx2, gy2, _ = _map(x2, y2)
+def drag(x1: float, y1: float, x2: float, y2: float, button: str = "left",
+         frame_id: str | None = None) -> str:
+    """Drag from (x1,y1) to (x2,y2), coords in screenshot `frame_id`'s pixel space."""
+    frame = coords.frames.resolve(frame_id)
+    gx1, gy1 = frame.to_global(x1, y1)
+    gx2, gy2 = frame.to_global(x2, y2)
+    inputs.reset_idle()
     inputs.drag(gx1, gy1, gx2, gy2, button)
-    return f"dragged screen({gx1},{gy1})->({gx2},{gy2}) [ref: {ref}]"
+    return f"dragged screen({gx1},{gy1})->({gx2},{gy2})"
 
 
 @mcp.tool()
-def scroll(x: float, y: float, direction: str = "down", amount: int = 3) -> str:
-    """Scroll at (x,y) (last-screenshot pixel space). direction: up|down."""
-    gx, gy, ref = _map(x, y)
+def scroll(x: float, y: float, direction: str = "down", amount: int = 3,
+           frame_id: str | None = None) -> str:
+    """Scroll at (x,y) (screenshot `frame_id` pixel space). direction: up|down."""
+    frame = coords.frames.resolve(frame_id)
+    gx, gy = frame.to_global(x, y)
+    inputs.reset_idle()
     inputs.scroll(gx, gy, direction, amount)
-    return f"scrolled {direction} x{amount} at screen({gx},{gy}) [ref: {ref}]"
+    return f"scrolled {direction} x{amount} at screen({gx},{gy})"
 
 
 # --- keyboard + focus -------------------------------------------------------
 
+def _focus_or_raise(con_id: int) -> None:
+    """Focus con_id, or raise — so keystrokes never go to an unverified window."""
+    if i3tree.find_window(con_id) is None:
+        raise ValueError(f"no window with con id {con_id}; call list_windows first")
+    if not i3tree.focus_window(con_id):
+        raise RuntimeError(
+            f"could not focus con {con_id} (window gone, or criteria matched "
+            "nothing); refusing to send input to the wrong window"
+        )
+
+
 @mcp.tool()
 def focus_window(con_id: int) -> str:
-    """Give i3 keyboard focus to a window (by con id) before typing into it."""
-    if i3tree.find_window(con_id) is None:
-        return f"No window with con id {con_id}."
-    ok = i3tree.focus_window(con_id)
-    return f"focus {'ok' if ok else 'FAILED'} for con {con_id}"
+    """Give i3 keyboard focus to a window (by con id). Raises if focus can't land."""
+    _focus_or_raise(con_id)
+    return f"focused con {con_id}"
 
 
 @mcp.tool()
 def type_text(text: str, con_id: int | None = None) -> str:
-    """Type text into the focused window. If con_id is given, focus it first.
+    """Type text into the focused window. If con_id is given, focus it first and
+    fail (no keystrokes sent) if that focus can't be verified.
 
-    Typing goes to whatever window has focus — always focus_window (or pass
-    con_id) first, or the text lands in the wrong place.
+    NOTE: embedded newlines are Enter keypresses (xdotool behavior), so multi-line
+    text submits line-by-line in single-line fields.
     """
     if con_id is not None:
-        i3tree.focus_window(con_id)
+        _focus_or_raise(con_id)
+    inputs.reset_idle()
     inputs.type_text(text)
     return f"typed {len(text)} chars" + (f" into con {con_id}" if con_id is not None else "")
 
 
 @mcp.tool()
 def key(keys: str, con_id: int | None = None) -> str:
-    """Press a key/chord in xdotool syntax (e.g. 'ctrl+s', 'Return', 'alt+Tab')."""
+    """Press a key/chord in xdotool syntax (e.g. 'ctrl+s', 'Return'). If con_id is
+    given, focus it first and fail if that focus can't be verified."""
     if con_id is not None:
-        i3tree.focus_window(con_id)
+        _focus_or_raise(con_id)
+    inputs.reset_idle()
     inputs.key(keys)
     return f"pressed {keys}"
 
@@ -193,16 +221,15 @@ def selftest() -> int:
     outs = i3tree.get_outputs()
     print(f"outputs: {[o['name'] for o in outs]}")
     wins = i3tree.list_windows()
-    focused = [w["title"] for w in wins if w["focused"]]
-    print(f"windows: {len(wins)} (focused: {focused})")
+    print(f"windows: {len(wins)} (focused: {[w['title'] for w in wins if w['focused']]})")
     prim = i3tree.primary_output(outs)
     if prim:
         r = prim["rect"]
         shot = capture.capture_region(r["x"], r["y"], r["w"], r["h"], f"output {prim['name']}")
         f = shot.frame
         print(
-            f"capture {prim['name']}: {f.shot_w}x{f.shot_h} scale={f.scale:.4f} "
-            f"png={len(shot.png)}B region={f.as_dict()['region']}"
+            f"capture {prim['name']}: {f.shot_w}x{f.shot_h} "
+            f"scale_x={f.scale_x:.4f} scale_y={f.scale_y:.4f} png={len(shot.png)}B"
         )
     print(f"mouse: {inputs.mouse_location()}")
     print("selftest OK")

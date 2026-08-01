@@ -78,13 +78,26 @@ Two consequences:
 - **A long automated run can lock you out.** Once locked, **do not send
   keystrokes** — they go straight into the (invisible) `xsecurelock` password
   field.
-- **Fix (planned):** have the server inhibit the screensaver + DPMS for the
-  duration of a session — `xset s off -dpms` on startup and restore on exit, or a
-  periodic `xset s reset` heartbeat while driving.
+- **Fix (implemented):** every tool call runs `inputs.reset_idle()` —
+  `xset s reset` + `xset dpms force on` — which resets the idle timer *while
+  actively driving*. It deliberately does **not** globally disable the
+  screensaver (`xset s off`), so the desktop still idle-locks normally once the
+  tool goes quiet, and there is no disabled state left dangling if the server
+  crashes (no fail-open, which the naive "disable + restore on exit" version
+  has). See `src/i3_cua_mcp/inputs.py::reset_idle`.
 
 Recovery is manual: real mouse/keyboard input wakes DPMS and brings up the auth
 prompt (a panel that was DPMS-off may not re-train and stay black — use a VT
 switch as the escape hatch).
+
+## focus_follows_mouse steals focus mid-sequence
+
+i3 defaults to `focus_follows_mouse yes`. A pointer tool (`click`/`scroll`/
+`move_mouse`/`drag`) moving over a different window changes keyboard focus — so a
+later `type_text` with no `con_id` lands there, not where an earlier
+`focus_window` put it. The sandbox config sets `focus_follows_mouse no`; on a
+live desktop, prefer passing `con_id` to `type_text`/`key` (which re-focuses and
+verifies immediately before typing) rather than relying on a stale focus.
 
 ## `pkill -f` self-matches the calling shell
 
