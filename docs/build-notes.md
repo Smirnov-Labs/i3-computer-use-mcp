@@ -67,3 +67,28 @@ Every bug in `gotchas.md` was found *during* this verification, not guessed at.
   realized on the next Claude Code restart.
 - On `:0`, prefer read-only tools; input reflows i3 and steals focus, so treat it
   with care around live work.
+
+## Live `:0` shakedown (2026-07-31)
+
+Drove the real desktop through the `i3-cua-live` MCP tools, confined to two
+throwaway targets (a floating scratch xterm + an incognito Chrome window) so no
+real work windows were touched, and using `focus_window`+`type` so no mouse moved
+for keyboard actions:
+
+- `type_text`/`key` ran `neofetch` in the scratch terminal (it read hexane back:
+  i3, i9-12900, RTX 3060, three panels).
+- `key ctrl+l` + `type_text` navigated the incognito window to `i3wm.org`.
+- `screenshot_window` + `click` (screenshot-pixel coords → global) clicked a nav
+  link, with before/after captures.
+
+Then it self-locked (see `gotchas.md`): xdotool input doesn't reset the DPMS idle
+timer, so xss-lock → xsecurelock fired ~5 min after the last *physical* input,
+mid-demo. Recovered by hand. Motivates the screensaver/DPMS-inhibit fix.
+
+## Token cost
+
+Screenshots are ~1,530 tokens flat (server caps at ~1.15 MP; a raw 4K grab would
+be ~11k, so the cap saves ~7×). `list_windows` (full tree) ≈ ~2,700 tokens — the
+heaviest call. A look→act cycle ≈ ~1,600 tokens; with `list_windows` targeting
+≈ ~4,300. On par with Anthropic's computer-use reference (~1–1.15k/shot at XGA);
+the main drag is verbose `list_windows` (a filter/compact mode would trim ~10×).

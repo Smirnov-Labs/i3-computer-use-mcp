@@ -64,3 +64,30 @@ primary). `grim` is installed but is Wayland-only; ignore it on X11.
 A newly `claude mcp add`-ed server is **not** available in the running session —
 restart / reconnect Claude Code to pick it up. That's why the sandbox and live
 entries are separate registrations, each realized on the next restart.
+
+## Automation self-locks the screen (DPMS / screensaver)
+
+Synthetic `xdotool` (XTEST) input does **not** reliably reset the X DPMS /
+screensaver idle timer. During a live `:0` session on 2026-07-31 the screen
+idle-locked mid-demo: `xss-lock` → `xsecurelock` fired ~5 min after the last
+*physical* input (DPMS `Standby=300`), and DPMS powered the panels off — landing
+in a black lock screen with no visible prompt.
+
+Two consequences:
+
+- **A long automated run can lock you out.** Once locked, **do not send
+  keystrokes** — they go straight into the (invisible) `xsecurelock` password
+  field.
+- **Fix (planned):** have the server inhibit the screensaver + DPMS for the
+  duration of a session — `xset s off -dpms` on startup and restore on exit, or a
+  periodic `xset s reset` heartbeat while driving.
+
+Recovery is manual: real mouse/keyboard input wakes DPMS and brings up the auth
+prompt (a panel that was DPMS-off may not re-train and stay black — use a VT
+switch as the escape hatch).
+
+## `pkill -f` self-matches the calling shell
+
+`pkill -f 'Xephyr :1'` also matches the shell running the command, because that
+pattern appears in the shell's own command line — so it SIGTERMs itself (exit
+144) before finishing. Match the process **name** instead: `pkill -x Xephyr`.
