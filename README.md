@@ -88,3 +88,9 @@ managed by `uv`.
 - On `:0` it can click anything you can: terminals with sudo, your password
   manager, Slack, email. Prefer the sandbox; supervise live runs.
 - Emergency stop for a live run: kill the MCP server, or `pkill xdotool`.
+- Long automated runs can idle-lock the screen (synthetic input doesn't reset the
+  DPMS/screensaver timer) — see [`docs/gotchas.md`](./docs/gotchas.md).
+
+## License
+
+MIT — see [LICENSE](./LICENSE).
