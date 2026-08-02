@@ -1,7 +1,7 @@
 """Tests for server tool wiring: focus-verify safety, frame-id contract, errors."""
 import pytest
 
-from i3_cua_mcp import coords, i3tree, inputs, server
+from i3_cua_mcp import coords, i3control, i3tree, inputs, server
 
 
 def _frame(**kw):
@@ -70,3 +70,21 @@ def test_screenshot_unknown_output_raises(monkeypatch):
                                   "rect": {"x": 0, "y": 0, "w": 100, "h": 100}}])
     with pytest.raises(ValueError):
         server.screenshot(output="NOPE")
+
+
+# --- i3control wiring ---
+
+def test_launch_resets_idle_and_delegates(monkeypatch):
+    seen = {}
+    monkeypatch.setattr(inputs, "reset_idle", lambda: seen.setdefault("idle", True))
+    monkeypatch.setattr(i3control, "launch", lambda cmd: seen.setdefault("cmd", cmd) or "ok")
+    server.launch("xterm -name foo")
+    assert seen == {"idle": True, "cmd": "xterm -name foo"}
+
+
+def test_move_window_to_workspace_delegates(monkeypatch):
+    seen = {}
+    monkeypatch.setattr(i3control, "move_window_to_workspace",
+                        lambda cid, ws: seen.update(cid=cid, ws=ws) or "moved")
+    server.move_window_to_workspace(42, "5")
+    assert seen == {"cid": 42, "ws": "5"}

@@ -97,7 +97,9 @@ Thin `xdotool` wrappers, all in global coordinates: `mousemove --sync`, `click`,
   Python list `[Image(...), caption_str]`, which serializes to an `image` +
   `text` content pair.
 
-## Scope boundary
+## Scope
 
-This server is **read + focus + input**. Layout mutation (move/resize/relayout/
-workspaces) is out of scope by design — see `../DESIGN-i3-control-extension.md`.
+**read + focus + input + i3 control.** i3 mutation (workspaces / layout / launch)
+lives in `i3control.py`, kept separate from the read-only `i3tree.py` so the
+mutating surface stays small and auditable; `run_i3` is a raw escape hatch that
+blocks `exit`. See `../DESIGN-i3-control-extension.md`.

@@ -22,13 +22,17 @@ Built for X11 (`xdotool` + ImageMagick `import` + i3 IPC). Not Wayland.
 | `get_outputs` | Active monitors and their global geometry |
 | `screenshot(output?)` | Screenshot one output (default: primary), downscaled to the API budget |
 | `screenshot_window(con_id)` | Full-res crop of a single window — best for reading small text |
-| `click / double_click / move_mouse / drag / scroll` | Pointer actions, coords in the last screenshot's pixel space |
+| `click / double_click / move_mouse / drag / scroll` | Pointer actions; coords in a screenshot's pixel space (pass its `frame_id`) |
 | `focus_window(con_id)` | i3-focus a window before typing |
 | `type_text(text, con_id?) / key(keys, con_id?)` | Keyboard input (optionally focus first) |
 | `get_mouse` | Current global pointer location |
+| `launch(command)` | Launch an app via i3 `exec` |
+| `goto_workspace(ws)` / `move_window_to_workspace(con_id, ws)` | Switch to / move a window to a workspace |
+| `set_floating(con_id, enable?)` / `set_layout(con_id, layout)` | Toggle floating / set container layout |
+| `run_i3(command)` | Raw i3-command escape hatch (`exit` blocked) |
 
-Scope is **read + focus + input**. Layout mutation (move/resize/relayout/
-workspaces) is intentionally excluded — see
+Scope is **read + focus + input + i3 control** (workspaces / layout / launch).
+The `run_i3` escape hatch blocks `exit`; details in
 [`DESIGN-i3-control-extension.md`](./DESIGN-i3-control-extension.md).
 
 ## The coordinate model (the important bit)

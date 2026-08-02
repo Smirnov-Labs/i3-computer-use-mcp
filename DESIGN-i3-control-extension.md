@@ -1,8 +1,15 @@
-# Option 2 — full i3 control (scoped, not yet built)
+# Option 2 — full i3 control (BUILT: native extension)
 
-v1 is **read + focus + input**. This note scopes the extension to full i3
-*control* (move/resize/relayout/workspaces/gaps) and weighs building it natively
-vs pairing with an existing i3 MCP server.
+**Status: built** as `src/i3_cua_mcp/i3control.py` (2026-08-01) — tools `launch`,
+`goto_workspace`, `move_window_to_workspace`, `set_floating`, `set_layout`, and
+the guarded `run_i3` escape hatch (blocks `exit`). We took **option A** (native).
+The discussion below is kept for the record.
+
+---
+
+This note scoped the extension to full i3 *control* (move/resize/relayout/
+workspaces/gaps) and weighed building it natively vs pairing with an existing i3
+MCP server.
 
 ## Two ways to get there
 

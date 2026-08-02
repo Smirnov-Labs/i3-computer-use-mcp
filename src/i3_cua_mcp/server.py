@@ -10,8 +10,8 @@ Two safety contracts enforced here:
 - Keyboard tools with a `con_id` VERIFY focus actually landed before sending any
   keystroke — a stale con_id fails loudly rather than typing into the wrong window.
 
-Scope: read + focus + input. Layout mutation is out of scope
-(see DESIGN-i3-control-extension.md).
+Scope: read + focus + input + i3 control (workspaces / layout / launch, in
+i3control.py; the `run_i3` escape hatch blocks `exit`).
 """
 from __future__ import annotations
 
@@ -21,7 +21,7 @@ import sys
 
 from mcp.server.mcpserver import MCPServer, Image
 
-from . import capture, coords, i3tree, inputs
+from . import capture, coords, i3control, i3tree, inputs
 
 mcp = MCPServer("i3-cua", version="0.1.0")
 
@@ -211,6 +211,50 @@ def key(keys: str, con_id: int | None = None) -> str:
 def get_mouse() -> str:
     """Current global pointer location."""
     return json.dumps(inputs.mouse_location())
+
+
+# --- i3 control (option 2: workspace / layout / launch) ---------------------
+
+@mcp.tool()
+def launch(command: str) -> str:
+    """Launch an app via i3 `exec` (runs `command` through sh -c). Opens on the
+    current workspace — pair with goto_workspace or move_window_to_workspace to
+    place it elsewhere."""
+    inputs.reset_idle()
+    return i3control.launch(command)
+
+
+@mcp.tool()
+def goto_workspace(workspace: str) -> str:
+    """Switch the focused output to a workspace (created if absent). A numeric
+    name uses i3 `number` matching; other names are matched literally."""
+    return i3control.goto_workspace(workspace)
+
+
+@mcp.tool()
+def move_window_to_workspace(con_id: int, workspace: str) -> str:
+    """Move a window (by con id) to a workspace without switching your view."""
+    return i3control.move_window_to_workspace(con_id, workspace)
+
+
+@mcp.tool()
+def set_floating(con_id: int, enable: bool = True) -> str:
+    """Enable/disable floating for a window (by con id)."""
+    return i3control.set_floating(con_id, enable)
+
+
+@mcp.tool()
+def set_layout(con_id: int, layout: str) -> str:
+    """Set a container's layout: splith|splitv|tabbed|stacking|default|toggle split."""
+    return i3control.set_layout(con_id, layout)
+
+
+@mcp.tool()
+def run_i3(command: str) -> str:
+    """Escape hatch: run a raw i3 command over IPC (e.g. 'resize set 800 600',
+    'move left', 'fullscreen toggle'). `exit` is blocked; there's no shell unless
+    the command itself is an `exec`."""
+    return i3control.run_i3(command)
 
 
 # --- entry point ------------------------------------------------------------
