@@ -26,6 +26,7 @@ Built for X11 (`xdotool` + ImageMagick `import` + i3 IPC). Not Wayland.
 | `focus_window(con_id)` | i3-focus a window before typing |
 | `type_text(text, con_id?) / key(keys, con_id?)` | Keyboard input (optionally focus first) |
 | `get_mouse` | Current global pointer location |
+| `read_clipboard(selection?)` / `write_clipboard(text, selection?, secret?)` | Exact text in/out of the X `clipboard`/`primary` selection (no OCR); `write` returns only a length, never the value |
 | `launch(command)` | Launch an app via i3 `exec` |
 | `goto_workspace(ws)` / `move_window_to_workspace(con_id, ws)` | Switch to / move a window to a workspace |
 | `set_floating(con_id, enable?)` / `set_layout(con_id, layout)` | Toggle floating / set container layout |
@@ -83,7 +84,7 @@ runs `uv sync` automatically (downloads Python 3.12 + deps into `.venv`).
 
 ## Requirements
 
-System: `xdotool`, `imagemagick` (`import`), `i3`, and for the sandbox `Xephyr`
+System: `xdotool`, `imagemagick` (`import`), `xclip`, `i3`, and for the sandbox `Xephyr`
 (`xorg-server-xephyr`) + `xterm`. Python deps (`mcp`, `i3ipc`, `pillow`) are
 managed by `uv`.
 

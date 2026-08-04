@@ -21,7 +21,7 @@ import sys
 
 from mcp.server.mcpserver import MCPServer, Image
 
-from . import capture, coords, i3control, i3tree, inputs
+from . import capture, clipboard, coords, i3control, i3tree, inputs
 
 mcp = MCPServer("i3-cua", version="0.1.0")
 
@@ -211,6 +211,24 @@ def key(keys: str, con_id: int | None = None) -> str:
 def get_mouse() -> str:
     """Current global pointer location."""
     return json.dumps(inputs.mouse_location())
+
+
+# --- clipboard (exact text in/out; no OCR) ----------------------------------
+
+@mcp.tool()
+def read_clipboard(selection: str = "clipboard") -> str:
+    """Read the text of an X selection: 'clipboard' (Ctrl-C / Ctrl-Shift-V) or
+    'primary' (select / middle-click). Returns '' if empty or unowned."""
+    return clipboard.read_clipboard(selection)
+
+
+@mcp.tool()
+def write_clipboard(text: str, selection: str = "clipboard", secret: bool = False) -> str:
+    """Set an X selection ('clipboard' or 'primary') to text, then paste with
+    key('ctrl+v' or 'ctrl+shift+v') or a middle-click. Returns only a length
+    summary — never the value. Pass secret=True for credentials so the value is
+    never logged."""
+    return clipboard.write_clipboard(text, selection, secret)
 
 
 # --- i3 control (option 2: workspace / layout / launch) ---------------------

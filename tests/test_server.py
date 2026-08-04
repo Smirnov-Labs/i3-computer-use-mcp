@@ -1,7 +1,7 @@
 """Tests for server tool wiring: focus-verify safety, frame-id contract, errors."""
 import pytest
 
-from i3_cua_mcp import coords, i3control, i3tree, inputs, server
+from i3_cua_mcp import clipboard, coords, i3control, i3tree, inputs, server
 
 
 def _frame(**kw):
@@ -88,3 +88,25 @@ def test_move_window_to_workspace_delegates(monkeypatch):
                         lambda cid, ws: seen.update(cid=cid, ws=ws) or "moved")
     server.move_window_to_workspace(42, "5")
     assert seen == {"cid": 42, "ws": "5"}
+
+
+# --- clipboard wiring (delegate; write muzzles the value) ---
+
+def test_read_clipboard_delegates(monkeypatch):
+    seen = {}
+    monkeypatch.setattr(clipboard, "read_clipboard",
+                        lambda sel: seen.update(sel=sel) or "cfut_X")
+    assert server.read_clipboard("primary") == "cfut_X"
+    assert seen == {"sel": "primary"}
+
+
+def test_write_clipboard_delegates_and_hides_value(monkeypatch):
+    seen = {}
+    monkeypatch.setattr(
+        clipboard, "write_clipboard",
+        lambda text, sel, secret: seen.update(text=text, sel=sel, secret=secret)
+        or "wrote 3 chars to CLIPBOARD [secret]",
+    )
+    out = server.write_clipboard("abc", selection="clipboard", secret=True)
+    assert seen == {"text": "abc", "sel": "clipboard", "secret": True}
+    assert "abc" not in out
