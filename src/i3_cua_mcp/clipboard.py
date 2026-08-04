@@ -54,3 +54,18 @@ def read_clipboard(selection: str = "clipboard") -> str:
     sel = _sel(selection)
     r = _run(["-selection", sel, "-o"])
     return r.stdout if r.returncode == 0 else ""
+
+
+def write_clipboard(text: str, selection: str = "clipboard", secret: bool = False) -> str:
+    """Set an X selection ('clipboard' or 'primary') to text; paste it with
+    key()/click() afterward.
+
+    Returns a length summary only — never the value. secret=True guarantees the
+    value is excluded from all logging (honored by the future task-runner action
+    log) and appends a [secret] marker.
+    """
+    sel = _sel(selection)
+    r = _run(["-selection", sel, "-i"], input=text, capture=False)
+    if r.returncode != 0:
+        raise ClipboardError(f"xclip write to {sel} failed (exit {r.returncode})")
+    return f"wrote {len(text)} chars to {sel.upper()}" + (" [secret]" if secret else "")
