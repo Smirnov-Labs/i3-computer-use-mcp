@@ -41,6 +41,8 @@ def _run(args: list[str], *, input: str | None = None, capture: bool = True):
         )
     except FileNotFoundError:
         raise ClipboardError("xclip not found; install it (e.g. `pacman -S xclip`)")
+    except subprocess.TimeoutExpired as e:
+        raise ClipboardError(f"xclip timed out after {CMD_TIMEOUT}s") from e
 
 
 def read_clipboard(selection: str = "clipboard") -> str:

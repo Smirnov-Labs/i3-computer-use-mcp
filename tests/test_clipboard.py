@@ -54,3 +54,12 @@ def test_run_raises_when_xclip_missing(monkeypatch):
     monkeypatch.setattr(subprocess, "run", missing)
     with pytest.raises(clipboard.ClipboardError):
         clipboard._run(["-selection", "clipboard", "-o"])
+
+
+def test_run_wraps_timeout_in_clipboarderror(monkeypatch):
+    def slow(argv, **kw):
+        raise subprocess.TimeoutExpired(cmd=argv, timeout=clipboard.CMD_TIMEOUT)
+
+    monkeypatch.setattr(subprocess, "run", slow)
+    with pytest.raises(clipboard.ClipboardError):
+        clipboard._run(["-selection", "clipboard", "-o"])
