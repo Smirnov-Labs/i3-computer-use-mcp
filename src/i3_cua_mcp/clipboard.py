@@ -60,9 +60,10 @@ def write_clipboard(text: str, selection: str = "clipboard", secret: bool = Fals
     """Set an X selection ('clipboard' or 'primary') to text; paste it with
     key()/click() afterward.
 
-    Returns a length summary only — never the value. secret=True guarantees the
-    value is excluded from all logging (honored by the future task-runner action
-    log) and appends a [secret] marker.
+    Returns a length summary only — never the value. secret=True appends a
+    [secret] marker and marks the value for redaction in the future task-runner
+    action log; it does NOT hide `text` from the MCP tool call itself (which the
+    client records), so it is not a substitute for treating the value as secret.
     """
     sel = _sel(selection)
     r = _run(["-selection", sel, "-i"], input=text, capture=False)

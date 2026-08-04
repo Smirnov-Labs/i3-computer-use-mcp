@@ -226,8 +226,9 @@ def read_clipboard(selection: str = "clipboard") -> str:
 def write_clipboard(text: str, selection: str = "clipboard", secret: bool = False) -> str:
     """Set an X selection ('clipboard' or 'primary') to text, then paste with
     key('ctrl+v' or 'ctrl+shift+v') or a middle-click. Returns only a length
-    summary — never the value. Pass secret=True for credentials so the value is
-    never logged."""
+    summary — never the value. secret=True marks the value for redaction in this
+    server's action log (not built yet) and keeps it out of the return; the text
+    still transits this tool call, so it appears in the MCP client's transcript."""
     return clipboard.write_clipboard(text, selection, secret)
 
 
