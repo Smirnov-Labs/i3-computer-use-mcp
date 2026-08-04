@@ -94,8 +94,9 @@ managed by `uv`.
 - On `:0` it can click anything you can: terminals with sudo, your password
   manager, Slack, email. Prefer the sandbox; supervise live runs.
 - Emergency stop for a live run: kill the MCP server, or `pkill xdotool`.
-- Every tool call resets the idle timer (`xset s reset`), so active runs don't
-  self-lock; the screen still locks normally when idle. See [`docs/gotchas.md`](./docs/gotchas.md).
+- Input tools (mouse, keyboard) and `launch` reset the idle timer (`xset s reset`)
+  so active runs don't self-lock; perception, clipboard, and workspace/layout tools
+  don't. The screen still locks normally when idle. See [`docs/gotchas.md`](./docs/gotchas.md).
 
 ## License
 
