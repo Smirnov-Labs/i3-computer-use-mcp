@@ -5,7 +5,7 @@ the verification, not just the code.
 
 ## Goal
 
-Let an MCP client (Claude Code) drive the **whole** X11 desktop on hexane —
+Let an MCP client (Claude Code) drive the **whole** X11 desktop on the dev machine —
 screenshot on its own, click UI elements, type — not just a browser. i3-aware,
 because a tiling WM with a three-output framebuffer makes blind pixel-guessing a
 bad bet.
@@ -75,7 +75,7 @@ throwaway targets (a floating scratch xterm + an incognito Chrome window) so no
 real work windows were touched, and using `focus_window`+`type` so no mouse moved
 for keyboard actions:
 
-- `type_text`/`key` ran `neofetch` in the scratch terminal (it read hexane back:
+- `type_text`/`key` ran `neofetch` in the scratch terminal (it read the machine back:
   i3, i9-12900, RTX 3060, three panels).
 - `key ctrl+l` + `type_text` navigated the incognito window to `i3wm.org`.
 - `screenshot_window` + `click` (screenshot-pixel coords → global) clicked a nav

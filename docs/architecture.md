@@ -58,7 +58,7 @@ rejected with a clear error, not silently mapped against the wrong frame.
 ## Display & socket resolution (why the sandbox is real)
 
 i3ipc's default socket discovery prefers the ambient `$I3SOCK` env var over
-`$DISPLAY`. On a machine that exports `I3SOCK` (hexane does), that binds every
+`$DISPLAY`. On a machine that exports `I3SOCK` (the dev machine does), that binds every
 client to the login `:0` i3 — so a server told to use `DISPLAY=:1` would still
 drive the real desktop. **Fail-open, and dangerous.**
 
@@ -74,7 +74,7 @@ the same code, one env var, no cross-talk.
 ## Capture pipeline
 
 1. `import -silent -window root png:-` grabs the **entire** X root (all outputs)
-   to stdout. On hexane that's 7680×2880 spanning three monitors — which is
+   to stdout. On the dev machine that's 7680×2880 spanning three monitors — which is
    exactly why we never hand that to the model whole.
 2. Pillow crops to the requested output/window's global rect.
 3. `_fit_scale` picks the largest scale ≤ 1.0 satisfying both a long-edge cap
