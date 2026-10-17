@@ -1,5 +1,7 @@
 # i3-cua-mcp
 
+> On Hyprland/Wayland? Use the successor, [hypr-cua-mcp](https://github.com/Smirnov-Labs/hypr-computer-use-mcp).
+
 An **i3-aware computer-use MCP server** for X11. It gives an MCP client (Claude
 Code, etc.) the ability to *see* your desktop, *understand* it via the i3 tree,
 and *drive* it with mouse + keyboard.
