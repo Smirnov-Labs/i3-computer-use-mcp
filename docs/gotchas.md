@@ -1,13 +1,13 @@
 # Gotchas & environment notes
 
-Hard-won lessons from building and verifying this on hexane (Arch, i3 4.25, X11,
+Hard-won lessons from building and verifying this on an Arch box (i3 4.25, X11,
 three outputs). Most of these are environment-specific landmines that cost real
 debugging time.
 
 ## i3ipc ignores `$DISPLAY` (the fail-open one)
 
 i3ipc's socket discovery order is `$I3SOCK` → `$SWAYSOCK` → X root-window atom.
-hexane **exports** `I3SOCK=/run/user/1000/i3/ipc-socket.<pid>` (the login `:0`
+The dev machine **exports** `I3SOCK=/run/user/1000/i3/ipc-socket.<pid>` (the login `:0`
 i3), so any i3ipc client binds to `:0` regardless of `DISPLAY`. A "sandbox" on
 `:1` would have silently driven the real desktop.
 
@@ -28,7 +28,7 @@ Launching the sandbox's nested i3 with `I3SOCK` still set makes it try to
 
 ## `fc-match monospace` → Noto Color Emoji → xterm dies
 
-On hexane, generic `monospace` resolves to `NotoColorEmoji.ttf` (fallout from the
+On the dev machine, generic `monospace` resolves to `NotoColorEmoji.ttf` (fallout from the
 Noto emoji strong-append in the user's `fonts.conf`). xterm then fails with:
 
 ```
@@ -47,7 +47,7 @@ to force, or `rm -f` the target first.
 ## Multi-output framebuffer
 
 `import -window root` grabs **all** outputs — 7680×2880 across three monitors on
-hexane. Downscaling that to the API budget destroys click accuracy, and
+the dev machine. Downscaling that to the API budget destroys click accuracy, and
 coordinates span monitors. Always capture **per output** (the default is the
 primary). `grim` is installed but is Wayland-only; ignore it on X11.
 

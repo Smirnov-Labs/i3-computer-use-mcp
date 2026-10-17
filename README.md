@@ -1,5 +1,7 @@
 # i3-cua-mcp
 
+> On Hyprland/Wayland? Use the successor, [hypr-cua-mcp](https://github.com/Smirnov-Labs/hypr-computer-use-mcp).
+
 An **i3-aware computer-use MCP server** for X11. It gives an MCP client (Claude
 Code, etc.) the ability to *see* your desktop, *understand* it via the i3 tree,
 and *drive* it with mouse + keyboard.
@@ -71,11 +73,11 @@ server targets the sandbox until you opt into live.
 
 ```bash
 # sandbox (safe default, DISPLAY=:1):
-claude mcp add i3-cua -- /home/vania/Projects/1.Personal/i3-computer-use-mcp/bin/i3-cua-mcp
+claude mcp add i3-cua -- /path/to/i3-computer-use-mcp/bin/i3-cua-mcp
 
 # live desktop (:0) — add when you trust it, as a separate entry:
 claude mcp add i3-cua-live -e I3CUA_DISPLAY=:0 -- \
-    /home/vania/Projects/1.Personal/i3-computer-use-mcp/bin/i3-cua-mcp
+    /path/to/i3-computer-use-mcp/bin/i3-cua-mcp
 ```
 
 Restart / reconnect Claude Code to pick up a newly-added server. First launch
