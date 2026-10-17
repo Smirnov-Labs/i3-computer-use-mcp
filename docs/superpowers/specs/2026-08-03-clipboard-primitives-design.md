@@ -2,7 +2,7 @@
 
 - **Date:** 2026-08-03
 - **Status:** design approved; pending spec review
-- **Repo:** `~/Projects/1.Personal/i3-computer-use-mcp`
+- **Repo:** `i3-computer-use-mcp`
 - **Sub-project:** 1 of 4
 
 ## Roadmap context

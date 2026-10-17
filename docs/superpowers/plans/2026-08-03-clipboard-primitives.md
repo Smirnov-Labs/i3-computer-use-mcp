@@ -449,7 +449,7 @@ Expected: PASS (all prior tests + the new clipboard/server tests), exit 0.
 
 - [ ] **Step 4: Update project memory**
 
-Edit `/home/vania/.claude/projects/-home-vania/memory/project_i3_cua_mcp.md`: add a dated bullet noting clipboard primitives shipped (tools `read_clipboard`/`write_clipboard`, `clipboard.py`, xclip backend, `secret=True` muzzle, DEVNULL-avoids-holder-hang gotcha), and that this is sub-project 1 of 4 (next: CDP, then tmux, then task-runner). Update the `MEMORY.md` one-line pointer if the tool count/summary changed.
+Edit the agent's project memory note (`project_i3_cua_mcp.md`): add a dated bullet noting clipboard primitives shipped (tools `read_clipboard`/`write_clipboard`, `clipboard.py`, xclip backend, `secret=True` muzzle, DEVNULL-avoids-holder-hang gotcha), and that this is sub-project 1 of 4 (next: CDP, then tmux, then task-runner). Update the `MEMORY.md` one-line pointer if the tool count/summary changed.
 
 - [ ] **Step 5: (No commit)** — verification + memory only. Leave the branch ready; integration (merge/PR) is handled separately via `superpowers:finishing-a-development-branch`.
 
